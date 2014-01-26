@@ -4,6 +4,7 @@ using System.Linq;
 using System.Net.Mail;
 using System.Text.RegularExpressions;
 using System.Web;
+using System.Web.WebPages;
 
 public class CommentHandler : IHttpHandler
 {
@@ -49,11 +50,17 @@ public class CommentHandler : IHttpHandler
         post.Comments.Add(comment);
         Storage.Save(post);
 
-        string wrapper = VirtualPathUtility.ToAbsolute("~/views/commentwrapper.cshtml") + "?postid=" + post.ID + "&commentid=" + comment.ID;
-        context.Response.Write(wrapper);
+        if (!context.User.Identity.IsAuthenticated)
+            System.Threading.ThreadPool.QueueUserWorkItem((s) => SendEmail(comment, post, context.Request));
 
-        //if (!context.User.Identity.IsAuthenticated)
-        System.Threading.ThreadPool.QueueUserWorkItem((s) => SendEmail(comment, post, context.Request));
+        RenderComment(context, comment);
+    }
+
+    private static void RenderComment(HttpContext context, Comment comment)
+    {
+        var page = (WebPage)WebPageBase.CreateInstanceFromVirtualPath("~/themes/" + Blog.Theme + "/comment.cshtml");
+        page.Context = new HttpContextWrapper(context);
+        page.ExecutePageHierarchy(new WebPageContext(page.Context, page: null, model: comment), context.Response.Output);
     }
 
     private static void SendEmail(Comment comment, Post post, HttpRequest request)
@@ -76,8 +83,7 @@ public class CommentHandler : IHttpHandler
                             "<br /><br /><hr />" +
                             "Website: " + comment.Website + "<br />" +
                             "E-mail: " + comment.Email + "<br />" +
-                            "IP-address: " + comment.Ip + "<br />" +
-                            request.UserAgent +
+                            "IP-address: " + comment.Ip +
                         "</div>";
 
 

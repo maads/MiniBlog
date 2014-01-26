@@ -1,6 +1,6 @@
 ﻿/* globals NodeList, HTMLCollection */
 
-window.onload = function () {
+(function () {
     var postId = null;
 
     //#region Helpers
@@ -29,6 +29,7 @@ window.onload = function () {
         var ajaxRequest = AsynObject.getAjaxRequest(callback);
         ajaxRequest.open("POST", url, true);
         ajaxRequest.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+        ajaxRequest.setRequestHeader("Connection", "close");
         ajaxRequest.send(objectToUrl(data));
     };
 
@@ -85,14 +86,6 @@ window.onload = function () {
         }
 
         return arr;
-    }
-
-    function bindEvent(el, eventName, eventHandler) {
-        if (el.addEventListener) {
-            el.addEventListener(eventName, eventHandler, false);
-        } else if (el.attachEvent) {
-            el.attachEvent('on' + eventName, eventHandler);
-        }
     }
 
     Element.prototype.remove = function () {
@@ -171,23 +164,18 @@ window.onload = function () {
 
             var elemStatus = document.getElementById("status");
             if (state === 4 && status === 200) {
-                elemStatus.innerText = "Your comment has been added";
+                elemStatus.innerHTML = "Your comment has been added";
                 removeClass(elemStatus, "alert-danger");
                 addClass(elemStatus, "alert-success");
 
                 document.getElementById("commentcontent").value = "";
 
-                AsynObject.ajax(data, function (state2, status2, html) {
-                    if (state2 === 4 && status2 === 200) {
-                        var comment = toDOM(html)[0];
-                        comment.style.height = "0px";
-                        BindDeleteCommentsEvent(comment);
-                        var elemComments = document.getElementById("comments");
-                        elemComments.appendChild(comment);
-                        slide(comment, "Down");
-                        callback(true);
-                    }
-                });
+                var comment = toDOM(data)[0];
+                comment.style.height = "0px";
+                var elemComments = document.getElementById("comments");
+                elemComments.appendChild(comment);
+                slide(comment, "Down");
+                callback(true);
 
                 return;
             }
@@ -205,15 +193,6 @@ window.onload = function () {
             content: content
         });
 
-    }
-
-    function BindDeleteCommentsEvent(element) {
-        bindEvent(element, 'click', function (e) {
-            e.preventDefault();
-            var button = e.target;
-            var element = getParentsByAttribute(button, "itemprop", "comment")[0];
-            deleteComment(element.getAttribute("data-id"), element);
-        });
     }
 
     function initialize() {
@@ -246,11 +225,14 @@ window.onload = function () {
             }
         });
 
-        var elementsDeleteComments = document.getElementsByClassName('deletecomment');
+        window.addEventListener("click", function (e) {
+            var tag = e.target;
 
-        for (var a = 0, len = elementsDeleteComments.length; a < len; a++) {
-            BindDeleteCommentsEvent(elementsDeleteComments[a]);
-        }
+            if (hasClass(tag, "deletecomment")) {
+                var comment = getParentsByAttribute(tag, "itemprop", "comment")[0];
+                deleteComment(comment.getAttribute("data-id"), comment);
+            }
+        });
 
         if (localStorage) {
             email.value = localStorage.getItem("email");
@@ -266,4 +248,4 @@ window.onload = function () {
         initialize();
     }
 
-};
+})();
