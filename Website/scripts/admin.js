@@ -21,11 +21,14 @@
     // #endregion
 
     var postId, isNew,
-        txtTitle, txtContent, txtMessage, txtImage, chkPublish,
-        btnNew, btnEdit, btnDelete, btnSave, btnCancel,
+        txtTitle, txtExcerpt, txtContent, txtMessage, txtImage, chkPublish,
+        btnNew, btnEdit, btnDelete, btnSave, btnCancel, blogPath,
 
     editPost = function () {
         txtTitle.attr('contentEditable', true);
+        txtExcerpt.attr('contentEditable', true);
+		txtExcerpt.css({ minHeight: "100px" });
+        txtExcerpt.parent().css('display', 'block');
         txtContent.wysiwyg({ hotKeys: {}, activeToolbarClass: "active" });
         txtContent.css({ minHeight: "400px" });
         txtContent.focus();
@@ -44,11 +47,13 @@
     },
     cancelEdit = function () {
         if (isNew) {
-            if (confirm("Do you want to leave this page?"))
+            if (confirm("Do you want to leave this page?")) {
                 history.back();
-        }
-        else {
+            }
+        } else {
             txtTitle.removeAttr('contentEditable');
+            txtExcerpt.removeAttr('contentEditable');
+            txtExcerpt.parent().css('display', 'none');
             txtContent.removeAttr('contentEditable');
             btnCancel.focus();
 
@@ -70,8 +75,7 @@
                 self.attr("data-cmd", "design");
                 self.addClass("active");
                 txtContent.text(txtContent.html());
-            }
-            else {
+            } else {
                 self.attr("data-cmd", "source");
                 self.removeClass("active");
                 txtContent.html(txtContent.text());
@@ -101,12 +105,14 @@
            the following statement and ConvertMarkupToXhtml function */
         parsedDOM = ConvertMarkupToValidXhtml(txtContent.html());
 
-        $.post("/post.ashx?mode=save", {
+        $.post(blogPath + "/post.ashx?mode=save", {
             id: postId,
             isPublished: chkPublish[0].checked,
             title: txtTitle.text().trim(),
+            excerpt: txtExcerpt.text().trim(),
             content: parsedDOM,
             categories: getPostCategories(),
+            __RequestVerificationToken: document.querySelector("input[name=__RequestVerificationToken]").getAttribute("value")
         })
           .success(function (data) {
               if (isNew) {
@@ -118,16 +124,17 @@
               cancelEdit(e);
           })
           .fail(function (data) {
-              if (data.status === 409)
+              if (data.status === 409) {
                   showMessage(false, "The title is already in use");
-              else
+              } else {
                   showMessage(false, "Something bad happened. Server reported " + data.status + " " + data.statusText);
+              }
           });
     },
     deletePost = function () {
         if (confirm("Are you sure you want to delete this post?")) {
-            $.post("/post.ashx?mode=delete", { id: postId })
-                .success(function () { location.href = "/"; })
+            $.post(blogPath + "/post.ashx?mode=delete", { id: postId, __RequestVerificationToken: document.querySelector("input[name=__RequestVerificationToken]").getAttribute("value") })
+                .success(function () { location.href = blogPath+"/"; })
                 .fail(function () { showMessage(false, "Something went wrong. Please try again"); });
         }
     },
@@ -145,10 +152,10 @@
     },
     getPostCategories = function () {
         var categories = '';
+
         if ($("#txtCategories").length > 0) {
             categories = $("#txtCategories").val();
-        }
-        else {
+        } else {
             $("ul.categories li a").each(function (index, item) {
                 if (categories.length > 0) {
                     categories += ",";
@@ -164,8 +171,7 @@
         $("ul.categories li").each(function (index, item) {
             if (!firstItemPassed) {
                 firstItemPassed = true;
-            }
-            else {
+            } else {
                 $(item).remove();
             }
         });
@@ -178,16 +184,15 @@
             $("#txtCategories").parent().remove();
 
             $.each(categoriesArray, function (index, category) {
-                $("ul.categories").append(' <li itemprop="articleSection" title="' + category + '"> <a href="/category/' + encodeURIComponent(category.toLowerCase()) + '">' + category + '</a> </li> ');
+                $("ul.categories").append(' <li itemprop="articleSection" title="' + category + '"> <a href="'+blogPath+'/category/' + encodeURIComponent(category.toLowerCase()) + '">' + category + '</a> </li> ');
             });
         }
     };
 
-    isNew = location.pathname.replace(/\//g, "") === "postnew";
-
     postId = $("[itemprop~='blogPost']").attr("data-id");
 
     txtTitle = $("[itemprop~='blogPost'] [itemprop~='name']");
+    txtExcerpt = $("[itemprop~='description']");
     txtContent = $("[itemprop~='articleBody']");
     txtMessage = $("#admin .alert");
     txtImage = $("#admin #txtImage");
@@ -198,12 +203,18 @@
     btnSave = $("#btnSave").bind("click", savePost);
     btnCancel = $("#btnCancel").bind("click", cancelEdit);
     chkPublish = $("#ispublished").find("input[type=checkbox]");
+    blogPath = $("#admin").data("blogPath");
+
+    isNew = location.pathname.replace(/\//g, "") === blogPath.replace(/\//g, "") + "postnew";
 
     $(document).keyup(function (e) {
-        if (e.keyCode === 46) // Delete key
-            deletePost();
-        else if (e.keyCode === 27) // ESC key
-            cancelEdit();
+        if (!document.activeElement.isContentEditable) {
+            if (e.keyCode === 46) { // Delete key
+                deletePost();
+            } else if (e.keyCode === 27) { // ESC key
+                cancelEdit();
+            }
+        }
     });
 
     $('.uploadimage').click(function (e) {
@@ -215,11 +226,9 @@
         editPost();
         $("#ispublished").fadeIn();
         chkPublish[0].checked = true;
-    }
-    else if (txtTitle !== null && txtTitle.length === 1 && location.pathname.length > 1) {
+    } else if (txtTitle !== null && txtTitle.length === 1 && location.pathname.length > 1) {
         btnEdit.removeAttr("disabled");
         btnDelete.removeAttr("disabled");
         $("#ispublished").css({ "display": "inline" });
     }
-
 })(jQuery);
